@@ -10,11 +10,12 @@ RUN git clone https://github.com/jgarff/rpi_ws281x.git && \
 FROM balenalib/%%BALENA_MACHINE_NAME%%-golang:latest-build AS build
 COPY --from=cbuilder /tmp/rpi_ws281x/*.a /usr/local/lib/
 COPY --from=cbuilder /tmp/rpi_ws281x/*.h /usr/local/include/
-WORKDIR /go/src/github.com/jdtobe/Zero/src/app
-COPY /src/app ./
+WORKDIR /go/src/app
+COPY /src/app/* ./
 RUN go get -v -u github.com/rpi-ws281x/rpi-ws281x-go
+RUN go get
 RUN go build -o app
 
 FROM balenalib/%%BALENA_MACHINE_NAME%%-debian:stretch
-COPY --from=build /go/src/github.com/jdtobe/Zero/src/app/* ./
+COPY --from=build /go/src/app/app ./
 CMD ./app
