@@ -7,8 +7,10 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/gorilla/mux"
 	colorful "github.com/lucasb-eyer/go-colorful"
 	ws2811 "github.com/rpi-ws281x/rpi-ws281x-go"
+	"github.com/spf13/cast"
 )
 
 func checkError(err error) {
@@ -26,23 +28,45 @@ func main() {
 	doLights()
 }
 
+var opt = ws2811.DefaultOptions
+
 func runServer() {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	r := mux.NewRouter()
+	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Holiday Lights, are Go!\n"))
 	})
+	r.HandleFunc("/settings/{setting}", func(w http.ResponseWriter, r *http.Request) {
+		v := r.FormValue("value")
+		vars := mux.Vars(r)
+		switch vars["setting"] {
+		case "ledLum", "brightness":
+			ledLum = cast.ToInt(v)
+			opt.Channels[0].Brightness = ledLum
+		case "drawDuration":
+			drawDuration = cast.ToInt(v)
+		case "fadeDuration":
+			fadeDuration = cast.ToInt(v)
+		case "fadeMultiplier":
+			fadeMultiplier = cast.ToFloat64(v)
+		default:
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "Unknown Setting: %q\n", vars["setting"])
+		}
+	})
 	addr := ":80"
-	fmt.Println("Piow Light Show")
-	log.Println("Listening on ", addr)
-	log.Fatal(http.ListenAndServe(addr, nil))
+	fmt.Println("Pi0w Light Show")
+	log.Println("Listening on: ", addr)
+	log.Fatal(http.ListenAndServe(addr, r))
 }
 
-const (
-	ledLum = 128
-	// ledLum = 200
-	ledNum = 100
-)
+const ledNum = 100
 
 var (
+	ledLum         = 200
+	drawDuration   = 200
+	fadeDuration   = 10
+	fadeMultiplier = 0.995
+
 	colorRed   = hsv{H: 0, S: 1.0, V: 1.0}
 	colorBlue  = hsv{H: 235, S: 1.0, V: 1.0}
 	colorGreen = hsv{H: 135, S: 1.0, V: 1.0}
@@ -54,10 +78,11 @@ type hsv struct {
 }
 
 func doLights() {
-	opt := ws2811.DefaultOptions
 	opt.Channels[0].Brightness = ledLum
 	opt.Channels[0].LedCount = ledNum
-	opt.Channels[0].StripeType = ws2811.WS2811StripBRG
+	// opt.Channels[0].StripeType = ws2811.WS2811StripBGR // red, green, red
+	// opt.Channels[0].StripeType = ws2811.WS2811StripBRG // red, blue, red
+	opt.Channels[0].StripeType = ws2811.WS2811StripRGB
 
 	m, err := ws2811.MakeWS2811(&opt)
 	checkError(err)
@@ -65,7 +90,7 @@ func doLights() {
 	checkError(m.Init())
 	defer m.Fini()
 
-	ledChain := []hsv{colorRed, colorWhite, colorGreen, colorWhite}
+	ledChain := []hsv{colorGreen, colorRed, colorGreen, colorWhite}
 
 	// muLeds := sync.RWMutex{}
 	leds := [ledNum]hsv{}
@@ -84,11 +109,11 @@ func doLights() {
 
 			// muLeds.Lock()
 			for i := range leds {
-				leds[i].V = leds[i].V * 0.98
+				leds[i].V = leds[i].V * fadeMultiplier
 			}
 			// muLeds.Unlock()
 
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(time.Duration(fadeDuration) * time.Millisecond)
 			// angle := float64(0.0)
 			// speed := 1.0 - math.Sin(angle)
 			// time.Sleep(time.Duration(int64(speed * 10 * float64(time.Millisecond))))
@@ -119,7 +144,7 @@ func doLights() {
 					leds[k] = ledChain[(k+offset)%len(ledChain)]
 				}
 				// muLeds.Unlock()
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(time.Duration(drawDuration) * time.Millisecond)
 			}
 			offset = (offset + 1) % ledChainLen
 		}
@@ -138,7 +163,7 @@ func doLights() {
 				// muLeds.RLock()
 				for i := 0; i < ledNum; i++ {
 					r, g, b := colorful.Hsv(leds[i].H, leds[i].S, leds[i].V).RGB255()
-					m.Leds(0)[i] = (uint32(r)<<8+uint32(b))<<8 + uint32(g)
+					m.Leds(0)[i] = (uint32(r)<<8+uint32(g))<<8 + uint32(b)
 				}
 				// muLeds.RUnlock()
 				checkError(m.Render())
