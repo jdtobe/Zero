@@ -1,21 +1,20 @@
-FROM balenalib/%%BALENA_MACHINE_NAME%%-golang:latest-build AS cbuilder
-#RUN [ "cross-build-start" ]
-WORKDIR /tmp
-RUN apt-get update -y && apt-get install -y scons
-RUN git clone https://github.com/jgarff/rpi_ws281x.git && \
-  cd rpi_ws281x && \
-  scons
-#RUN [ "cross-build-end" ]
-
 FROM balenalib/%%BALENA_MACHINE_NAME%%-golang:latest-build AS build
-COPY --from=cbuilder /tmp/rpi_ws281x/*.a /usr/local/lib/
-COPY --from=cbuilder /tmp/rpi_ws281x/*.h /usr/local/include/
+RUN apt-get update -y && apt-get install -y scons && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /tmp
+RUN git clone https://github.com/jgarff/rpi_ws281x.git && \
+  cd /tmp/rpi_ws281x && \
+  scons && \
+  cp /tmp/rpi_ws281x/*.a /usr/local/lib/ && \
+  cp /tmp/rpi_ws281x/*.h /usr/local/include/
+
 WORKDIR /go/src/app
 COPY /src/app/* ./
-RUN go get -v -u github.com/rpi-ws281x/rpi-ws281x-go
+RUN go get -u github.com/rpi-ws281x/rpi-ws281x-go
 RUN go get
 RUN go build -o app
 
-FROM balenalib/%%BALENA_MACHINE_NAME%%-debian:stretch
+# FROM balenalib/%%BALENA_MACHINE_NAME%%-debian:stretch
+FROM balenalib/%%BALENA_MACHINE_NAME%%-debian:run
 COPY --from=build /go/src/app/app ./
 CMD ./app
