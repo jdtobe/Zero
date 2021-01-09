@@ -1,4 +1,4 @@
-package main
+package animation
 
 import (
 	"context"
@@ -6,11 +6,24 @@ import (
 	"log"
 	"math/rand"
 	"time"
+
+	"github.com/jdtobe/Zero/color"
+	"github.com/jdtobe/Zero/env"
 )
 
-const xmasTreeShowName = "xmas-tree"
+//////////////////// DELETE THESE ///////////////////////////
+var (
+	ledNum         = env.GetDefaultInt("LED_NUM", 50)
+	ledLum         = env.GetDefaultInt("LED_LUM", 255/2) // half-brightness
+	drawDuration   = env.GetDefaultInt("DRAW_DURATION", 200)
+	fadeDuration   = env.GetDefaultInt("FADE_DURATION", 5)
+	fadeMultiplier = env.GetDefaultFloat64("FADE_MULTIPLIER", 0.995)
+)
 
-func xmasTreeShow(ctx context.Context, pixels []hsv) error {
+//////////////////// DELETE THESE ///////////////////////////
+
+// XmasTree is an animation that resembles a glittery green tree with occasional bulbs that show up and fade out.
+func XmasTree(ctx context.Context, pixels []color.HSV) error {
 	fmt.Println("Starting X-Mas Tree Show...")
 
 	skip := map[int]bool{}
@@ -30,9 +43,9 @@ func xmasTreeShow(ctx context.Context, pixels []hsv) error {
 				if skip[i] {
 					continue
 				}
-				go func(ctx context.Context, color hsv) {
+				go func(ctx context.Context, c color.HSV) {
 					skip[i] = true
-					pixels[i] = color
+					pixels[i] = c
 					fadingOut := true
 
 					// Bulb Fade Routine
@@ -49,16 +62,16 @@ func xmasTreeShow(ctx context.Context, pixels []hsv) error {
 								v = pixels[i].V * fadeMultiplier
 								if v < 0.1 {
 									fadingOut = false
-									pixels[i].H = colorGreen.H
-									pixels[i].S = colorGreen.S
+									pixels[i].H = color.Green.H
+									pixels[i].S = color.Green.S
 								}
 								pixels[i].V = v
 								continue
 							}
 
 							v = pixels[i].V * (2 - fadeMultiplier)
-							if v > colorGreen.V {
-								pixels[i].V = colorGreen.V
+							if v > color.Green.V {
+								pixels[i].V = color.Green.V
 								skip[i] = false
 								ticker.Stop()
 								return
@@ -66,13 +79,13 @@ func xmasTreeShow(ctx context.Context, pixels []hsv) error {
 							pixels[i].V = v
 						}
 					}
-				}(ctx, []hsv{colorRed, colorBlue, colorPurple, colorPink, colorWhite}[rand.Intn(5)])
+				}(ctx, []color.HSV{color.Red, color.Blue, color.Purple, color.Pink, color.White}[rand.Intn(5)])
 			}
 		}
 	}()
 
 	// Sparkle
-	o := colorGreen
+	o := color.Green
 	o.S -= 0.25
 	go ahSparkleSkipHSV(ctx, pixels, skip, o, 80, 0.5, 0.25, 5000)
 
@@ -84,12 +97,11 @@ func xmasTreeShow(ctx context.Context, pixels []hsv) error {
 	return nil
 }
 
-const originalShowName = "original"
-
-func originalShow(ctx context.Context, pixels []hsv) error {
+// Original is the first animation written.
+func Original(ctx context.Context, pixels []color.HSV) error {
 	fmt.Println("Starting Original Show...")
 
-	ledChain := []hsv{colorGreen, colorRed, colorGreen, colorWhite}
+	ledChain := []color.HSV{color.Green, color.Red, color.Green, color.White}
 
 	// Setup Faders
 	go ahFadeHSV(ctx, pixels, fadeDuration, fadeMultiplier)

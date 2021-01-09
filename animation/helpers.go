@@ -1,4 +1,4 @@
-package main
+package animation
 
 import (
 	"context"
@@ -6,11 +6,11 @@ import (
 	"math/rand"
 	"time"
 
-	ws2811 "github.com/rpi-ws281x/rpi-ws281x-go"
+	"github.com/jdtobe/Zero/color"
 )
 
 // FadeHSV fades the Value of an HSV slice of pixels by m every d ms.
-func ahFadeHSV(ctx context.Context, pixels []hsv, d int, m float64) {
+func ahFadeHSV(ctx context.Context, pixels []color.HSV, d int, m float64) {
 	ticker := time.NewTicker(time.Duration(d) * time.Millisecond)
 
 	for {
@@ -27,7 +27,7 @@ func ahFadeHSV(ctx context.Context, pixels []hsv, d int, m float64) {
 }
 
 // SparkleHSV "sparkles" an HSV slice of pixels, relative to o in Hue, Saturation and Value, by the provided limits (hl, sl, vl), every d ms.
-func ahSparkleHSV(ctx context.Context, pixels []hsv, o hsv, hl, sl, vl float64, d int) {
+func ahSparkleHSV(ctx context.Context, pixels []color.HSV, o color.HSV, hl, sl, vl float64, d int) {
 	ticker := time.NewTicker(time.Duration(d) * time.Millisecond)
 
 	var h, s, v float64
@@ -56,7 +56,7 @@ func ahSparkleHSV(ctx context.Context, pixels []hsv, o hsv, hl, sl, vl float64, 
 // o - Original pixel value to sparkle.
 // hl, sl, vl - Hue, Saturation and Value limits to sparkle.
 // d - Sparkle delay, in ms.
-func ahSparkleSkipHSV(ctx context.Context, pixels []hsv, skip map[int]bool, o hsv, hl, sl, vl float64, d int) {
+func ahSparkleSkipHSV(ctx context.Context, pixels []color.HSV, skip map[int]bool, o color.HSV, hl, sl, vl float64, d int) {
 	ticker := time.NewTicker(time.Duration(d) * time.Millisecond)
 
 	var h, s, v float64
@@ -78,26 +78,6 @@ func ahSparkleSkipHSV(ctx context.Context, pixels []hsv, skip map[int]bool, o hs
 				pixels[i].H = h
 				pixels[i].S = s
 				pixels[i].V = v
-			}
-		}
-	}
-}
-
-// ShowHSV displays an HSV slice to the LED String once per millisecond.
-func ahShowHSV(ctx context.Context, m *ws2811.WS2811, pixels []hsv) {
-	ticker := time.NewTicker(time.Millisecond)
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Println("Exiting: Show")
-			return
-		case <-ticker.C:
-			for i := 0; i < len(pixels); i++ {
-				m.Leds(0)[i] = pixels[i].RgbUInt32()
-			}
-			if err := m.Render(); err != nil {
-				log.Fatal("Show Error: ", err)
 			}
 		}
 	}
